@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Penjadwalan Round Robin</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #f4f6f8;
+      margin: 0;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: auto;
+      background: #ffffff;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    }
+
+    h2, h3 {
+      text-align: center;
+      color: #333;
+    }
+
+    label {
+      font-weight: bold;
+    }
+
+    input[type="number"] {
+      padding: 5px;
+      margin-right: 10px;
+      width: 80px;
+    }
+
+    button {
+      background-color: #3498db;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 5px;
+      font-size: 14px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+
+    button:hover {
+      background-color: #2980b9;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+
+    th, td {
+      border: 1px solid #ddd;
+      padding: 10px;
+      text-align: center;
+    }
+
+    th {
+      background-color: #f0f0f0;
+    }
+
+    .form-table {
+      width: 100%;
+      margin-top: 15px;
+    }
+
+    .form-table th, .form-table td {
+      border: 1px solid #ccc;
+      padding: 10px;
+      text-align: center;
+    }
+
+    .form-table input {
+      width: 60px;
+      padding: 5px;
+      text-align: center;
+      border-radius: 5px;
+      border: 1px solid #aaa;
+    }
+
+    .gantt {
+      display: flex;
+      margin-top: 20px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .gantt-block {
+      background-color: #5dade2;
+      color: white;
+      padding: 10px;
+      margin: 2px;
+      border-radius: 5px;
+      min-width: 60px;
+      text-align: center;
+    }
+
+    .summary {
+      text-align: center;
+      margin-top: 20px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h2>Simulasi Penjadwalan Round Robin</h2>
+
+  <label>Jumlah Proses:</label>
+  <input type="number" id="jumlahProses" min="1" value="3">
+  <label>Quantum:</label>
+  <input type="number" id="quantum" min="1" value="2">
+  <button onclick="buatForm()">Buat Input</button>
+
+  <form id="formInput"></form>
+
+  <button onclick="jalankanRoundRobin()">Jalankan Penjadwalan</button>
+
+  <div id="output"></div>
+</div>
+
+<script>
+  function buatForm() {
+    const jumlah = parseInt(document.getElementById('jumlahProses').value);
+    const form = document.getElementById('formInput');
+    form.innerHTML = '<h3>Input Data Proses</h3>';
+
+    let html = `
+      <table class="form-table">
+        <tr>
+          <th>No</th>
+          <th>Nama Proses</th>
+          <th>Arrival Time</th>
+          <th>Burst Time</th>
+        </tr>
+    `;
+
+    for (let i = 0; i < jumlah; i++) {
+      html += `
+        <tr>
+          <td>${i + 1}</td>
+          <td>P${i + 1}</td>
+          <td><input type="number" id="arrival${i}" value="${i}" min="0" required></td>
+          <td><input type="number" id="burst${i}" value="4" min="1" required></td>
+        </tr>
+      `;
+    }
+
+    html += '</table>';
+    form.innerHTML = html;
+  }
+
+  function jalankanRoundRobin() {
+    const n = parseInt(document.getElementById('jumlahProses').value);
+    const quantum = parseInt(document.getElementById('quantum').value);
+
+    let proses = [];
+
+    for (let i = 0; i < n; i++) {
+      let arrival = parseInt(document.getElementById(`arrival${i}`).value);
+      let burst = parseInt(document.getElementById(`burst${i}`).value);
+
+      if (isNaN(arrival) || isNaN(burst)) {
+        alert("Mohon isi semua nilai Arrival dan Burst Time.");
+        return;
+      }
+
+      proses.push({
+        id: i + 1,
+        arrival,
+        burst,
+        remaining: burst,
+        waiting: 0,
+        turnaround: 0,
+        completed: false,
+      });
+    }
+
+    let time = 0;
+    let queue = [];
+    let timeline = [];
+
+    while (true) {
+      for (let i = 0; i < n; i++) {
+        if (proses[i].arrival <= time && proses[i].remaining > 0 && !queue.includes(proses[i])) {
+          queue.push(proses[i]);
+        }
+      }
+
+      if (queue.length === 0) {
+        if (proses.every(p => p.remaining === 0)) break;
+        time++;
+        continue;
+      }
+
+      let current = queue.shift();
+      let block = { proses: current.id, start: time };
+
+      if (current.remaining > quantum) {
+        time += quantum;
+        current.remaining -= quantum;
+      } else {
+        time += current.remaining;
+        current.waiting = time - current.arrival - current.burst;
+        current.turnaround = time - current.arrival;
+        current.remaining = 0;
+        current.completed = true;
+      }
+
+      block.end = time;
+      timeline.push(block);
+
+      for (let i = 0; i < n; i++) {
+        if (proses[i].arrival <= time && proses[i].remaining > 0 && !queue.includes(proses[i]) && proses[i] !== current) {
+          queue.push(proses[i]);
+        }
+      }
+
+      if (current.remaining > 0) queue.push(current);
+    }
+
+    // Gantt Chart
+    let ganttHTML = '<div class="gantt">';
+    for (let block of timeline) {
+      ganttHTML += `<div class="gantt-block">
+        P${block.proses}<br><small>${block.start} - ${block.end}</small>
+      </div>`;
+    }
+    ganttHTML += '</div>';
+
+    // Tabel hasil
+    let tableHTML = `<table>
+      <tr>
+        <th>Proses</th>
+        <th>Arrival Time</th>
+        <th>Burst Time</th>
+        <th>Waiting Time</th>
+        <th>Turnaround Time</th>
+      </tr>`;
+
+    let totalWT = 0, totalTAT = 0;
+    for (let p of proses) {
+      tableHTML += `<tr>
+        <td>P${p.id}</td>
+        <td>${p.arrival}</td>
+        <td>${p.burst}</td>
+        <td>${p.waiting}</td>
+        <td>${p.turnaround}</td>
+      </tr>`;
+      totalWT += p.waiting;
+      totalTAT += p.turnaround;
+    }
+    tableHTML += '</table>';
+
+    // Output akhir
+    const output = `
+      <h3>Gantt Chart</h3>
+      ${ganttHTML}
+      <h3>Hasil Perhitungan</h3>
+      ${tableHTML}
+      <div class="summary">
+        Rata-rata Waiting Time: ${(totalWT / n).toFixed(2)}<br>
+        Rata-rata Turnaround Time: ${(totalTAT / n).toFixed(2)}
+      </div>
+    `;
+
+    document.getElementById('output').innerHTML = output;
+  }
+</script>
+
+</body>
+</html>
